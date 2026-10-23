@@ -1,0 +1,5 @@
+llm:
+  ollama:
+    provider: "ollama"
+    model_name: "qwen3:4b"
+    base_url: "http://localhost:11434"
