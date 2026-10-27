@@ -55,24 +55,40 @@ Some features depend on valid API credentials, internet access, service quotas, 
 
 ```mermaid
 flowchart TD
-    U[User] --> UI[Streamlit frontend]
-    UI -->|POST /query| API[FastAPI backend]
-    API --> AG[Compiled LangGraph workflow]
-    AG --> LLM[Ollama: qwen3:4b]
-    LLM -->|Tool call| TN[LangGraph ToolNode]
+    U[User] -->|Enters a travel question| UI[Streamlit frontend]
+    UI -->|HTTP POST /query with JSON| API[FastAPI backend]
+    API -->|invoke question| G[Compiled LangGraph workflow]
+
+    G --> A[Agent node]
+    A <-->|Prompt / model output| LLM[Ollama: qwen3:4b]
+    A --> R{Does the model request a tool?}
+    R -->|Yes| TN[LangGraph ToolNode]
+    R -->|No: final assistant message| F[Final graph state]
+
     TN --> PS[Place search tools]
-    TN --> WS[Weather tools]
-    TN --> CC[Currency conversion tool]
-    TN --> EC[Expense calculator tools]
+    TN --> W[Weather tools]
+    TN --> C[Currency conversion tool]
+    TN --> E[Expense calculator tools]
     PS --> GP[Google Places]
     PS --> TV[Tavily Search fallback]
-    WS --> OW[OpenWeatherMap]
-    CC --> ER[ExchangeRate-API]
-    TN -->|Tool results| LLM
-    LLM -->|Final response| API
-    API --> UI
-    UI --> U
+    W --> OW[OpenWeatherMap]
+    C --> ER[ExchangeRate-API]
+    GP -->|Place data| PS
+    TV -->|Search results| PS
+    OW -->|Weather data| W
+    ER -->|Exchange rates| C
+    PS -->|Tool result via graph state| A
+    W -->|Tool result via graph state| A
+    C -->|Tool result via graph state| A
+    E -->|Calculated result via graph state| A
+
+    F -->|Graph output containing final message| API
+    API -->|HTTP response: JSON answer| UI
+    UI -->|Renders answer as Markdown| U
 ```
+
+
+**Response path:** Ollama returns its model output to the LangGraph agent node. LangGraph checks whether the model requested a tool; if so, the tool executes and its result is fed back into the agent loop. When the graph finishes, `main.py` extracts the final message and returns `{"answer": final_output}` as the HTTP response to Streamlit. Ollama does not send the HTTP response directly to FastAPI.
 
 ### Main components
 
